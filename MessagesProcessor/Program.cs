@@ -17,9 +17,7 @@ builder.Services
     .AddOptions<MessageProcessorOptions>()
     .BindConfiguration(MessageProcessorOptions.SectionName);
 
-builder.Services.AddTransient<IOrderDelivery, OrderDeliverProcessor>();
-builder.Services.AddTransient<IOrderConfirmation, OrderConfirmationProcessor>();
-builder.Services.AddTransient<IOrderInvoice, OrderInvoiceProcessor>();
+builder.Services.AddTransient<IOrderHandler, OrderHandler>();
 
 builder.Services.AddHttpClient();
 

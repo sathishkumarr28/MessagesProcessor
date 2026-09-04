@@ -17,6 +17,7 @@ that wraps a typed payload:
 {
     "dataType":"OrderConfirmation",
     "data":{
+        "OrderId":123,
         "Quantity":53,
         "CustomerName":"Sathish"
    }
@@ -25,6 +26,7 @@ that wraps a typed payload:
 {
     "dataType":"OrderDelivery",
     "data":{
+        "OrderId":123,
         "CustomerAddress":"202, Flat, Coimbatore",
         "CustomerName":"Sathish",
         "CustomerPhoneNumber":8886599773
@@ -34,6 +36,7 @@ that wraps a typed payload:
 {
     "dataType":"OrderInvoice",
     "data":{
+        "OrderId":123,
         "OrderAmount":5000,
         "InvoiceNumber":"XTY-53869",
         "BillingDate":"2026-09-02"

@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "ServiceBusConnection": "<Service-bus-connection-removed>",
+
+    "MessageProcessor:EndpointUrls:OrderConfirmationData": "https://localhost:5001/api/order-confirmations",
+    "MessageProcessor:EndpointUrls:OrderDeliveryData": "https://localhost:5001/api/order-deliveries",
+    "MessageProcessor:EndpointUrls:OrderInvoiceData": "https://localhost:5001/api/order-invoices"
+
+  }  
+}

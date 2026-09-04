@@ -4,7 +4,7 @@ namespace MessagesProcessor.Messages;
 
 public class OrderConfirmationData : BaseData
 {
-    [Required]
+    [Range(0, int.MaxValue, ErrorMessage = "Quantity must be a non-negative number.")]
     public int Quantity { get; set; }
 
     [Required(ErrorMessage = "CustomerName is required.")]

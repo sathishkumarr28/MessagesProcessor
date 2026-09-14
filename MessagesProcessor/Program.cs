@@ -17,8 +17,13 @@ builder.Services
     .AddOptions<MessageProcessorOptions>()
     .BindConfiguration(MessageProcessorOptions.SectionName);
 
-builder.Services.AddTransient<IOrderHandler, OrderHandler>();
+// In-memory idempotency store for this simple/local solution.
+builder.Services.AddSingleton<IIdempotencyService, InMemoryIdempotencyService>();
+builder.Services.AddSingleton<IMessageHandler, OrderConfirmationHandler>();
+builder.Services.AddSingleton<IMessageHandler, OrderDeliveryHandler>();
+builder.Services.AddSingleton<IMessageHandler, OrderInvoiceHandler>();
 
-builder.Services.AddHttpClient();
+builder.Services
+    .AddHttpClient();
 
 builder.Build().Run();

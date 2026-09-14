@@ -10,18 +10,18 @@ namespace MessagesProcessor;
 
 public class MessageProcessorFunction
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
     private readonly ILogger<MessageProcessorFunction> _logger;
-    private readonly IOrderHandler _orderHandler;
+    private readonly IIdempotencyService _idempotencyService;
+    private readonly Dictionary<string, IMessageHandler> _handlers = new();
 
-    public MessageProcessorFunction(ILogger<MessageProcessorFunction> logger, IOrderHandler orderHandler)
+    public MessageProcessorFunction(
+        ILogger<MessageProcessorFunction> logger,
+        IEnumerable<IMessageHandler> handlers,
+        IIdempotencyService idempotencyService)
     {
         _logger = logger;
-        _orderHandler = orderHandler;
+        _idempotencyService = idempotencyService;
+        _handlers = handlers.ToDictionary(h => h.DataType);
     }
 
     [Function(nameof(MessageProcessorFunction))]
@@ -35,8 +35,6 @@ public class MessageProcessorFunction
 
         var body = message.Body.ToString();
 
-        //PKCE
-        //idempotency
         string? dataType;
         try
         {
@@ -52,69 +50,43 @@ public class MessageProcessorFunction
             return;
         }
 
+        var idempotencyKey = message.MessageId;
+
         try
         {
-            switch (dataType)
+            if (dataType is null || !_handlers.TryGetValue(dataType, out var handler))
             {
-                case "OrderConfirmation":
-                    {
-                        var data = Deserialize<OrderConfirmationData>(body);
-                        ValidateData(data);
-                        _logger.LogInformation("Order Confirmation Data= Order Id: {OrderId}, Quantity={Quantity}, CustomerName={CustomerName}",
-                            data.OrderId, data.Quantity, data.CustomerName);
-                        await _orderHandler.HandleOrders(data);
-                        break;
-                    }
-
-                case "OrderDelivery":
-                    {
-                        var data = Deserialize<OrderDeliveryData>(body);
-                        ValidateData(data);
-                        _logger.LogInformation("Order Delivery Data= Order Id: {OrderId}, Customer Name={CustomerName}, Customer Address={CustomerAddress}, Customer Phone number: {CustomerPhoneNumber}",
-                            data.OrderId, data.CustomerName, data.CustomerAddress, data.CustomerPhoneNumber);
-                        await _orderHandler.HandleOrders(data);
-                        break;
-                    }
-
-                case "OrderInvoice":
-                    {
-                        var data = Deserialize<OrderInvoiceData>(body);
-                        ValidateData(data);
-                        _logger.LogInformation("Order Invoice Data= Order Id: {OrderId}, Order Amount={OrderAmount}, Billing Date={BillingDate}",
-                            data.OrderId, data.OrderAmount, data.BillingDate);
-                        await _orderHandler.HandleOrders(data);
-                        break;
-                    }
-                default:
-                    {
-                        _logger.LogError("Message type '{MessageType}' not supported.", dataType);
-                        await messageActions.DeadLetterMessageAsync(message, deadLetterReason: "Unsupported message type", deadLetterErrorDescription: $"The message type '{dataType}' is not supported.");
-                        break;
-                    }
+                _logger.LogWarning("No handler found for message type '{MessageType}'.", dataType);
+                await _idempotencyService.ReleaseAsync(idempotencyKey);
+                await messageActions.DeadLetterMessageAsync(message, deadLetterReason: "HandlerNotFound", deadLetterErrorDescription: $"No handler found for message type '{dataType}'.");
+                return;
             }
+
+            if (!await _idempotencyService.TryReserveAsync(idempotencyKey))
+            {
+                _logger.LogInformation("Duplicate message detected for key '{Key}'. Skipping processing.", idempotencyKey);
+                await messageActions.CompleteMessageAsync(message);
+                return;
+            }
+
+            await handler.HandleAsync(body);
+
+            await _idempotencyService.MarkProcessedAsync(idempotencyKey);
+        }
+        catch (ValidationException ex)
+        {
+            _logger.LogError(ex, "Validation failed for message type '{MessageType}'.", dataType);
+            await messageActions.DeadLetterMessageAsync(message, deadLetterReason: "ValidationFailed", deadLetterErrorDescription: ex.Message);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unable to process the order");
+            // Release the reservation so the message can be retried on redelivery.
             throw;
         }
-    }
-
-    private static T Deserialize<T>(string body) where T : BaseData, new()
-    {
-        var envelope = JsonSerializer.Deserialize<SystemMessage<T>>(body, SerializerOptions);
-        return envelope?.Data
-            ?? throw new JsonException("Envelope 'data' payload is missing.");
-    }
-
-    private static void ValidateData<T>(T data) where T : BaseData
-    {
-        var validationContext = new ValidationContext(data);
-        var validationResults = new List<ValidationResult>();
-        if (!Validator.TryValidateObject(data, validationContext, validationResults, true))
+        finally
         {
-            var errorMessages = string.Join("; ", validationResults.Select(r => r.ErrorMessage));
-            throw new ValidationException($"Validation failed for {typeof(T).Name}: {errorMessages}");
+            await _idempotencyService.ReleaseAsync(idempotencyKey);
         }
     }
 }

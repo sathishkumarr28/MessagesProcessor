@@ -2,8 +2,9 @@
   "IsEncrypted": false,
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AZURE_TENANT_ID": "8ac76c91-e7f1-41ff-a89c-3553b2da2c17",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "ServiceBusConnection": "<Service-bus-connection-removed>",
+    "ServiceBusConnection__fullyQualifiedNamespace": "sb-message-processor.servicebus.windows.net",
 
     "MessageProcessor:EndpointUrls:OrderConfirmationData": "https://localhost:5001/api/order-confirmations",
     "MessageProcessor:EndpointUrls:OrderDeliveryData": "https://localhost:5001/api/order-deliveries",
